@@ -366,7 +366,7 @@ static void render() {
         float ax = SW / 2.f, ay = SH - 60.f;
         glBegin(GL_TRIANGLES); glColor3f(1, 0.9f, 0.1f);
         glVertex3f(ax + dx * 22, ay + dy * 22, 0);
-        glV        glVertex3f(ax - dx * 10 - dy * 12, ay - dy * 10 + dx * 12, 0);
+             glVertex3f(ax - dx * 10 - dy * 12, ay - dy * 10 + dx * 12, 0);
         glVertex3f(ax - dx * 10 + dy * 12, ay - dy * 10 - dx * 12, 0);
         glEnd();
     } else text(SW / 2 - 110, SH - 20, "Press E to start a mission", 0.8f, 1, 0.8f);
