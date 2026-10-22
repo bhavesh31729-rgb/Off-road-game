@@ -366,4 +366,72 @@ static void render() {
         float ax = SW / 2.f, ay = SH - 60.f;
         glBegin(GL_TRIANGLES); glColor3f(1, 0.9f, 0.1f);
         glVertex3f(ax + dx * 22, ay + dy * 22, 0);
-        glV
+        glV        glVertex3f(ax - dx * 10 - dy * 12, ay - dy * 10 + dx * 12, 0);
+        glVertex3f(ax - dx * 10 + dy * 12, ay - dy * 10 - dx * 12, 0);
+        glEnd();
+    } else text(SW / 2 - 110, SH - 20, "Press E to start a mission", 0.8f, 1, 0.8f);
+    if (msgT > 0) text(SW / 2 - 150, SH / 2 + 60, msg, 1, 1, 1);
+    if (inGarage()) {
+        float y = SH / 2 + 30; text(20, y, "== GARAGE ==", 1, 0.7f, 0.2f);
+        for (int i = 0; i < 3; i++) {
+            if (owned & (1 << i)) sprintf(b, "%d  %s  [owned]%s  Eng L%d  Tires L%d", i + 1, TD[i].name, i == cur ? " <-" : "", eng[i], tire[i]);
+            else sprintf(b, "%d  %s  - buy $%d", i + 1, TD[i].name, (int)TD[i].price);
+            text(20, y -= 20, b);
+        }
+        sprintf(b, "U  Engine upgrade  $%d", 600 * (eng[cur] + 1)); text(20, y -= 20, b);
+        sprintf(b, "T  Tires upgrade   $%d", 500 * (tire[cur] + 1)); text(20, y -= 20, b);
+    }
+    text(10, 10, "W/S gas/brake  A/D steer  SPACE handbrake  E mission  R garage  ESC save+quit", 0.9f, 0.9f, 0.9f);
+}
+
+static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
+    switch (m) {
+    case WM_CLOSE: running = false; return 0;
+    case WM_SYSCOMMAND: if ((w & 0xFFF0) == SC_SCREENSAVE || (w & 0xFFF0) == SC_MONITORPOWER) return 0; break;
+    }
+    return DefWindowProc(h, m, w, l);
+}
+
+int WINAPI WinMain(HINSTANCE hi, HINSTANCE, LPSTR, int) {
+    FILE *cf = fopen("config.txt", "r"); if (cf) { fscanf(cf, "%d %d %d", &SW, &SH, &FULL); fclose(cf); }
+    if (SW < 320) SW = 640;
+    if (SH < 240) SH = 480;
+    srand(GetTickCount());
+    WNDCLASSA wc; memset(&wc, 0, sizeof wc);
+    wc.style = CS_OWNDC; wc.lpfnWndProc = WndProc; wc.hInstance = hi; wc.hCursor = LoadCursor(NULL, IDC_ARROW); wc.lpszClassName = "OffroadHero";
+    RegisterClassA(&wc);
+    DWORD style = FULL ? WS_POPUP : (WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX);
+    RECT rc = { 0, 0, SW, SH }; AdjustWindowRect(&rc, style, FALSE);
+    if (FULL) {
+        DEVMODEA dm; memset(&dm, 0, sizeof dm); dm.dmSize = sizeof dm; dm.dmPelsWidth = SW; dm.dmPelsHeight = SH; dm.dmBitsPerPel = 16;
+        dm.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_BITSPERPEL; ChangeDisplaySettingsA(&dm, CDS_FULLSCREEN);
+        rc.left = rc.top = 0; rc.right = SW; rc.bottom = SH;
+    }
+    hwnd = CreateWindowA("OffroadHero", "Offroad Hero", style | WS_VISIBLE, 50, 50, rc.right - rc.left, rc.bottom - rc.top, NULL, NULL, hi, NULL);
+    hdc = GetDC(hwnd);
+    PIXELFORMATDESCRIPTOR pfd; memset(&pfd, 0, sizeof pfd);
+    pfd.nSize = sizeof pfd; pfd.nVersion = 1; pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
+    pfd.iPixelType = PFD_TYPE_RGBA; pfd.cColorBits = 16; pfd.cDepthBits = 16; pfd.iLayerType = PFD_MAIN_PLANE;
+    int pf = ChoosePixelFormat(hdc, &pfd); SetPixelFormat(hdc, pf, &pfd);
+    hrc = wglCreateContext(hdc); wglMakeCurrent(hdc, hrc);
+    glViewport(0, 0, SW, SH);
+    fontBase = glGenLists(96);
+    HFONT f = CreateFontA(-15, 0, 0, 0, FW_BOLD, 0, 0, 0, ANSI_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, FF_DONTCARE | DEFAULT_PITCH, "Arial");
+    SelectObject(hdc, f); wglUseFontBitmapsA(hdc, 32, 96, fontBase);
+    loadGame(); resetTruck();
+    say("Welcome! Visit the garage (orange beacon), press E for missions.", 6);
+
+    LARGE_INTEGER fq, t0, t1; QueryPerformanceFrequency(&fq); QueryPerformanceCounter(&t0);
+    MSG m;
+    while (running) {
+        while (PeekMessage(&m, NULL, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessage(&m); }
+        QueryPerformanceCounter(&t1);
+        float dt = (float)((double)(t1.QuadPart - t0.QuadPart) / (double)fq.QuadPart); t0 = t1;
+        if (dt > 0.05f) dt = 0.05f;
+        update(dt); render(); SwapBuffers(hdc); Sleep(1);
+    }
+    saveGame();
+    wglMakeCurrent(NULL, NULL); wglDeleteContext(hrc); ReleaseDC(hwnd, hdc); DestroyWindow(hwnd);
+    if (FULL) ChangeDisplaySettingsA(NULL, 0);
+    return 0;
+}
